@@ -1,0 +1,12 @@
+[Unit]
+Description=Goss Service
+
+[Service]
+WorkingDirectory=/etc/goss
+ExecStart=/usr/local/bin/prom-run-v0.0.2 -period 5m /usr/local/bin/goss -g /etc/goss/goss-linux-check.yaml v
+Restart=on-failure
+RestartSec=5s
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

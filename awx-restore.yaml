@@ -1,0 +1,10 @@
+---
+- name: awx-restore
+  hosts: all
+  gather_facts: false
+  become: true
+  roles:
+  - awx-crds
+  - awx-operator
+  - awx-restore
+

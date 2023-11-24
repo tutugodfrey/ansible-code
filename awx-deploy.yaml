@@ -1,0 +1,10 @@
+---
+ name: deploy-awx
+  hosts: all
+  gather_facts: false
+  become: true
+  roles:
+  - awx-crds
+  - awx-operator
+  - awx-deploy
+

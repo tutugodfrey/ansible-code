@@ -1,0 +1,36 @@
+---
+- name: Copy goss file
+  copy:
+    dest: "/etc/goss/"
+    src: templates/goss-linux-check.yaml
+
+- name: Download prom-run binary from artifactory
+  ansible.builtin.get_url:
+    # url: "https://uxbinaries.artifactory.homedepot.com/artifactory/uxbinaries-release-local/thdks/prom-run/prom-run-v0.0.2"
+    username: "{{ artifactory_credentials.username }}"
+    password: "{{ artifactory_credentials.uxbinaries }}"
+    dest: /usr/local/bin/
+    mode: "0755"
+    owner: root
+    group: root
+    timeout: 300
+    force: true
+  register: download_binary
+  until: download_binary.status_code == 200 or download_binary.status_code == 304
+  retries: 5
+  delay: 7
+
+- name: Add systemd service
+  template:
+    src: templates/goss.service
+    dest: /etc/systemd/system/
+
+- name: Reload systemd
+  command: systemctl daemon-reload
+
+- name: Start systemd service
+  service:
+    name: goss.service
+    state: restarted
+    enabled: yes
+

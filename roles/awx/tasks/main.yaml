@@ -1,0 +1,29 @@
+---
+- name: clone repo
+  git:
+     clone: true
+     single_branch: true
+     repo: git@github.com:one-thd/awx.git
+     dest: /tmp/awx/
+     version: branch_name/Head
+     key_file: /root/.ssh/id_rsa
+  delegate_to: "{{ inventory_hostname }}"
+  run_once: true
+  register: awx_repo
+
+- name: build kustomization
+  shell:
+    chdir: /tmp/awx/
+    cmd: kustomize build overlays/awx > /tmp/awx/awx.yaml
+  delegate_to: "{{ inventory_hostname }}"
+  run_once: true
+  register: awx_awxdeploy
+  
+- name: Apply AWX awxdeploy
+  k8s:
+    state: present
+    src: /tmp/awx/awx.yaml
+    kubeconfig: /etc/rancher/k3s/k3s.yaml
+  delegate_to: "{{ inventory_hostname }}"
+  run_once: true
+

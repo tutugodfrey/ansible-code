@@ -1,0 +1,7 @@
+---
+- name: validate linux layer
+  hosts: all
+  gather_facts: false
+  become: true
+  roles:
+  - role: goss-validate-linux
