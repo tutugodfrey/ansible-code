@@ -1,0 +1,13 @@
+apiVersion: awx.ansible.com/v1beta1
+kind: AWXBackup
+metadata:
+  name: "awxbackup-{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}"
+  namespace: awx
+spec:
+  deployment_name:  awx
+  postgres_configuration_secret: awx-postgres-configuration
+  set_self_labels: true
+  no_log: false
+  precreate_partition_hours: 0
+  clean_backup_on_delete: true
+

@@ -1,0 +1,10 @@
+AWX_GITHUB_USERNAME: "{{ awx_credentials.json.data.data.AWX_GITHUB_USERNAME }}"
+AWX_GITHUB_PAT: "{{ awx_credentials.json.data.data.AWX_GITHUB_PAT }}"
+AWX_SSH_KEY_PRIV_BASE64: "{{ awx_credentials.json.data.data.AWX_SSH_KEY_PRIV_BASE64 | b64decode }}"
+KUBESPRAY_ED25519: "{{ awx_credentials.json.data.data.KUBESPRAY_ED25519 | b64decode }}"
+awx_admin_password: "{{ awx_credentials.json.data.data.AWX_ADMIN_PASSWORD | b64decode }}"
+awx_admin_username: "{{ awx_credentials.json.data.data.AWX_ADMIN_USERNAME }}"
+awx_restore_host: "{{ awx_credentials.json.data.data.AWX_RESTORE_HOST }}"
+awx_restore_wait_time: "{{ awx_credentials.json.data.data.AWX_RESTORE_WAIT_TIME }}"
+vault_url: https://vault-kuber-dev.np-store-monarch.str.homedepot.com
+kubeconfig: /etc/rancher/k3s/k3s.yaml

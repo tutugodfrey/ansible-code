@@ -1,0 +1,8 @@
+--
+- import_playbook: proxy_env.yml
+
+- hosts: ldc25117
+  gather_facts: true
+  become: true
+  roles:
+    - role: awx-configure

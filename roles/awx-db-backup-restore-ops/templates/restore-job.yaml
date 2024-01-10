@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: awx-postgres-restore
+  namespace: "{{ awx_namespace }}"
+spec:
+  template:
+    spec:
+      nodeName: "{{ awx_target_nodename }}"
+      containers:
+      - image: docker.artifactory.homedepot.com/postgres:13
+        imagePullPolicy: IfNotPresent
+        name: postgres
+        command: ["/bin/bash", "-c", "psql -U ${POSTGRES_USER}  -h ${POSTGRES_HOST} -d ${POSTGRES_DB} -p ${POSTGRES_PORT} <  /tmp/awx-postgres-backup-data/${BACKUP_FILE}"]
+        env:
+        - name: BACKUP_FILE
+          value: "{{ awx_postgres_backup_file }}"
+        - name: POSTGRES_PORT
+          valueFrom:
+            secretKeyRef:
+              key: port
+              name: "{{ awx_postgres_secret_name }}"
+        - name: POSTGRES_HOST
+          valueFrom:
+            configMapKeyRef:
+              key: postgres_host
+              name: awx-db-job-config
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              key: database
+              name: "{{ awx_postgres_secret_name }}"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              key: username
+              name: "{{ awx_postgres_secret_name }}"
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: password
+              name: "{{ awx_postgres_secret_name }}"
+        - name: POSTGRES_HOST_AUTH_METHOD
+          value: scram-sha-256
+        volumeMounts:
+          - name: awx-backup-data
+            mountPath: /tmp/awx-postgres-backup-data
+      dnsPolicy: ClusterFirst
+      restartPolicy: OnFailure
+      imagePullSecrets:
+      - name: imagepull
+      volumes:
+        - name: awx-backup-data
+          hostPath:
+            path: /awx-postgres-backup-data
+            type: DirectoryOrCreate

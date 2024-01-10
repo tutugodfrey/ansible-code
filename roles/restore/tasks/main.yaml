@@ -27,3 +27,148 @@
   delegate_to: "{{ inventory_hostname }}"
   run_once: true
 
+---
+- name: Retrieve AWX secrets from Vault
+  uri:
+    url: "{{ vault_url }}/v1/thdks/data/global/awx"
+    method: GET
+    headers:
+      Content-Type: application/json
+      X-Vault-Token: "{{ vault_token }}"
+    validate_certs: no
+  register: awx_credentials
+  run_once: true
+  delegate_to: localhost
+
+- name: Set AWX variables
+  set_fact:
+    awxrestore_config:
+      artifactory_username: "{{ artifactory_username }}"
+      artifactory_password: "{{ artifactory_password }}"
+      artifactory_url: "https://uxbinaries.artifactory.homedepot.com/artifactory/uxbinaries-release-local/thdks/awx-backup"
+      awx_admin_username: "{{ awx_admin_username }}"
+      host: "{{ awx_restore_host }}"
+      awx_admin_password: "{{ awx_admin_password  }}"
+      awx_restore_wait_time: "{{ awx_restore_wait_time }}"
+
+- name: Get All Backup
+  kubernetes.core.k8s_info:
+    namespace: awx
+    api_version: awx.ansible.com/v1beta1
+    kubeconfig: "{{ kubeconfig }}"
+    kind: AWXBackup
+  run_once: true
+  register: _awxbackups
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Group backups by timestamp
+  set_fact:
+    backups: |
+      {{ backups|default([]) + 
+        [{ 
+          'backup_name': item.metadata.name,
+          'backup_timestamp': ((item.metadata.creationTimestamp | to_datetime('%Y-%m-%dT%H:%M:%S%z')).strftime('%s') | int) 
+        }]
+      }}
+  loop_control:
+    label: "{ item.metadata.name }}"
+  with_items: "{{ _awxbackups.resources }}"
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Set Target Backup
+  set_fact:
+    target_backup: "{{ (backups | sort(attribute='backup_timestamp'))[-1]['backup_name'] }}"
+  delegate_to: "{{ inventory_hostname }}"
+  run_once: true
+
+- name: Apply AWX restore
+  kubernetes.core.k8s:
+    state: present
+    template: templates/awx-restore.yaml
+    kubeconfig: "{{ kubeconfig }}"
+    wait_condition:
+      type: Successful
+      reason: Successful
+      status: "True"
+    wait_timeout: "{{ awxrestore_config.awx_restore_wait_time }}"
+  delegate_to: "{{ inventory_hostname }}"
+  run_once: true
+      
+- name: Create archive dir if not exist
+  file:
+    path: /tmp/awx-restore/
+    state: directory
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Get awx config from artifactory
+  get_url:
+    url: "{{ awxrestore_config.artifactory_url }}/{{ target_backup }}.tar"
+    password: "{{ awxrestore_config.artifactory_password }}"
+    username: "{{ awxrestore_config.artifactory_username }}"
+    dest: /tmp/awx-restore/
+    owner: root
+    group: root
+    force: true
+  register: download_binary
+  until: download_binary.status_code == 200 or download_binary.status_code == 304
+  retries: 5
+  delay: 7
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Unarchive awx config
+  unarchive:
+    src: "/tmp/awx-restore/{{ target_backup }}.tar"
+    dest: "/tmp/awx-restore/"
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+  #- name: Sleep
+  #  wait_for:
+  #    timeout: "{{ awxrestore_config.awx_restore_wait_time }}"
+  #  run_once: true
+  #  delegate_to: "{{ inventory_hostname }}"
+  #
+- name: AWX Login
+  shell: awx login
+  environment:
+    CONTROLLER_HOST: "{{ awxrestore_config.host  }}"
+    CONTROLLER_USERNAME: "{{ awxrestore_config.awx_admin_username }}"
+    CONTROLLER_PASSWORD: "{{ awxrestore_config.awx_admin_password }}"
+  register: CONTROLLER_TOKEN
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Debug
+  debug:
+    msg: "{{ CONTROLLER_TOKEN.stdout }}"
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Import AWX Config
+  awx.awx.import:
+    assets: '{{ lookup("file", "/tmp/awx-restore/{{ target_backup }}/{{ item }}.yaml") | from_yaml() }}'
+    controller_host: "{{ awxrestore_config.host }}"
+    controller_username: "{{ awxrestore_config.awx_admin_username }}"
+    controller_password: "{{ awxrestore_config.awx_admin_password }}"
+    controller_oauthtoken: "{{ CONTROLLER_TOKEN.stdout }}"
+  ignore_errors: yes
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+  loop:
+  - inventory
+  - teams
+  - users
+  - organizations
+  - execution_environments
+  - credential_types
+  - job_templates
+  - schedules
+  - applications
+  - notification_templates
+  - projects
+  - credentials
+  - hosts  
+

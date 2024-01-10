@@ -1,0 +1,198 @@
+---
+- name: Retrieve AWX secrets from Vault
+  uri:
+    url: "{{ vault_url }}/v1/thdks/data/global/awx"
+    method: GET
+    headers:
+      Content-Type: application/json
+      X-Vault-Token: "{{ vault_token }}"
+    validate_certs: no
+  register: awx_credentials
+  run_once: true
+  delegate_to: localhost
+
+- name: Create a directory if it does not exist
+  ansible.builtin.file:
+    path: /home/ubuntu/awx/config
+    state: directory
+    mode: '0755'
+
+- name: Extract awx config yamls into /home/ubuntu/awx
+  ansible.builtin.unarchive:
+    src: st0000_awx_yamls.tar
+    dest: /home/ubuntu/awx/config
+
+- name: Install AWX CLI with proxy
+  pip:
+    name: awxkit
+    executable: /usr/bin/pip3
+    state: present
+  environment:
+    - "{{ proxy_env }}"
+
+- name: Get Password for awx controller
+  ansible.builtin.shell: kubectl get secret awx-admin-password -o jsonpath="{.data.password}" -n awx | base64 -d
+  register: CONTROLLER_PASSWORD
+
+- name: Set awx token
+  ansible.builtin.shell: awx login
+  environment:
+    CONTROLLER_HOST: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    CONTROLLER_USERNAME: 'admin'
+    CONTROLLER_PASSWORD: '{{ CONTROLLER_PASSWORD.stdout }}'
+  register: CONTROLLER_TOKEN
+
+- name: add Secrets to st0000_awx_credentials.yaml (Spacing is very important on Github ssh key)
+  ansible.builtin.template:
+    src: st0000_awx_credentials.yaml.j2
+    dest: /home/ubuntu/awx/config/yamls/st0000_awx_credentials.yaml
+
+- name: add Container Registry Credentials to st0000_awx_execution_environments.yaml
+  ansible.builtin.template:
+    src: st0000_awx_execution_environments.yaml.j2
+    dest: /home/ubuntu/awx/config/yamls/st0000_awx_execution_environments.yaml
+
+- name: Set the value of AWX_TASK_ENV (Environment Variables under settings -> job settings tab)
+  awx.awx.settings:
+    controller_host: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    controller_username: 'admin'
+    controller_password: '{{ CONTROLLER_PASSWORD.stdout }}'
+    controller_oauthtoken: '{{ CONTROLLER_TOKEN.stdout }}'
+    settings:
+      AWX_TASK_ENV:
+        ANSIBLE_FORCE_COLOR: "false"
+        GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+        HTTPS_PROXY: "http://thd-svr-proxy-qa.homedepot.com:7070"
+        HTTP_PROXY: "http://thd-svr-proxy-qa.homedepot.com:7070"
+        http_proxy: "http://thd-svr-proxy-qa.homedepot.com:7070"
+        https_proxy: "http://thd-svr-proxy-qa.homedepot.com:7070"
+        NO_PROXY: ".homedepot.com,localhost,127.0.0.1,10.*.*.*,kubernetes.default.svc.cluster.local"
+
+- name: Set the value of GALAXY_TASK_ENV (Environment Variables under settings -> job settings tab)
+  awx.awx.settings:
+    controller_host: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    controller_username: 'admin'
+    controller_password: '{{ CONTROLLER_PASSWORD.stdout }}'
+    controller_oauthtoken: '{{ CONTROLLER_TOKEN.stdout }}'
+    settings:
+      GALAXY_TASK_ENV:
+        ANSIBLE_FORCE_COLOR: "false"
+        GIT_SSH_COMMAND: "ssh -o StrictHostKeyChecking=no"
+        HTTPS_PROXY: "http://thd-svr-proxy-qa.homedepot.com:7070"
+        HTTP_PROXY: "http://thd-svr-proxy-qa.homedepot.com:7070"
+        http_proxy: "http://thd-svr-proxy-qa.homedepot.com:7070"
+        https_proxy: "http://thd-svr-proxy-qa.homedepot.com:7070"
+        NO_PROXY: ".homedepot.com,localhost,127.0.0.1,10.*.*.*,kubernetes.default.svc.cluster.local"
+
+- name: Import Initial AWX Settings Files (Credentials, etc)
+  awx.awx.import:
+    assets: "{{ lookup('file', '/home/ubuntu/awx/config/yamls/{{ item }}') | from_yaml() }}"
+    controller_host: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    controller_username: 'admin'
+    controller_password: '{{ CONTROLLER_PASSWORD.stdout }}'
+    controller_oauthtoken: '{{ CONTROLLER_TOKEN.stdout }}'
+  ignore_errors: yes
+  loop:
+   - st0000_awx_credential_types.yaml
+   - st0000_awx_users.yaml
+   - st0000_awx_organizations.yaml
+   - st0000_awx_credentials.yaml
+   - st0000_awx_execution_environments.yaml
+   - st0000_awx_projects.yaml
+
+- name: Add DEV inventory
+  awx.awx.inventory:
+    name: "DEV"
+    description: "Dev Inventory From Config Project"
+    organization: "Default"
+    state: present
+    controller_host: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    controller_username: 'admin'
+    controller_password: '{{ CONTROLLER_PASSWORD.stdout }}'
+    controller_oauthtoken: '{{ CONTROLLER_TOKEN.stdout }}'
+
+- name: Add NP inventory
+  awx.awx.inventory:
+    name: "NP"
+    description: "NP Inventory From Config Project"
+    organization: "Default"
+    state: present
+    controller_host: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    controller_username: 'admin'
+    controller_password: '{{ CONTROLLER_PASSWORD.stdout }}'
+    controller_oauthtoken: '{{ CONTROLLER_TOKEN.stdout }}'
+
+- name: Import Remaining AWX Settings Files
+  awx.awx.import:
+    assets: "{{ lookup('file', '/home/ubuntu/awx/config/yamls/{{ item }}') | from_yaml() }}"
+    controller_host: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    controller_username: 'admin'
+    controller_password: '{{ CONTROLLER_PASSWORD.stdout }}'
+    controller_oauthtoken: '{{ CONTROLLER_TOKEN.stdout }}'
+  ignore_errors: yes
+  loop:
+   - st0000_awx_notification_templates.yaml   
+   - st0000_awx_job_templates.yaml
+   - st0000_awx_workflow_job_templates.yaml
+   - st0000_awx_inventory_sources.yaml
+   - st0000_awx_schedules.yaml
+
+- name: Run Inventory Sources update to import Hosts into AWX
+  awx.awx.inventory_source_update:
+    name: "{{ item.name }}"
+    inventory: "{{ item.inventory }}"
+    organization: Default
+    controller_host: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    controller_username: 'admin'
+    controller_password: '{{ CONTROLLER_PASSWORD.stdout }}'
+    controller_oauthtoken: '{{ CONTROLLER_TOKEN.stdout }}'
+  loop:
+    - { name: 'config', inventory: 'DEV' }
+    - { name: 'Config NP', inventory: 'NP' }
+
+- name: Run Project Syncs for Code, Config, and Code - No Refresh
+  awx.awx.project_update:
+    project: "{{ item }}"
+    controller_host: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    controller_username: 'admin'
+    controller_password: '{{ CONTROLLER_PASSWORD.stdout }}'
+    controller_oauthtoken: '{{ CONTROLLER_TOKEN.stdout }}'
+  loop:
+   - Code
+   - Config
+   - "Code - Main - No Refresh"
+
+- name: Launch a test job to make sure it works
+  awx.awx.job_launch:
+    job_template: "Get IPs SSH Test"
+    limit: st5003
+    controller_host: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    controller_username: 'admin'
+    controller_password: '{{ CONTROLLER_PASSWORD.stdout }}'
+    controller_oauthtoken: '{{ CONTROLLER_TOKEN.stdout }}'
+
+- name: Load st0000_awx_users.yaml into Var - so they can be processed
+  ansible.builtin.set_fact:
+    users: "{{ lookup('file', '/home/ubuntu/awx/config/yamls/st0000_awx_users.yaml') | from_yaml() }}"
+
+- name: Pull out all usernames from st0000_awx_users.yaml (Thanks Royce)
+  ansible.builtin.set_fact:
+    usernames: |
+      {% set usernames = [] -%}
+        {% for key in users.keys() -%}
+          {% for value in users[key] -%}
+            {% set ignored = usernames.append(value.username) -%}
+          {%- endfor %}
+        {%- endfor %}
+      {{ usernames }}
+
+- name: Delete all imported users. If not done, LDAP will not work for imported users
+  awx.awx.user:
+    username: "{{ item }}"
+    state: absent
+    controller_host: 'http://{{ inventory_hostname_short }}.homedepot.com:13331'
+    controller_username: 'admin'
+    controller_password: '{{ CONTROLLER_PASSWORD.stdout }}'
+    controller_oauthtoken: '{{ CONTROLLER_TOKEN.stdout }}'
+  loop: "{{ usernames }}"
+

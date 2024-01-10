@@ -1,0 +1,106 @@
+---
+- name: Update apt repo
+  shell: |
+    apt update -y
+    apt -y upgrade;
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+  #- name: Update apt repo 2
+  #  shell: |
+  #    apt -y upgrade;
+  #  run_once: true
+  #  delegate_to: "{{ inventory_hostname }}"
+
+  #- name: Update apt repo 3
+  #  shell: |
+  #    wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
+  #  run_once: true
+  #  delegate_to: "{{ inventory_hostname }}"
+  #
+- name: Update apt repo 4
+  shell: |
+    echo "deb http://apt.postgresql.org/pub/repos/apt/ `lsb_release -cs`-pgdg main" | tee  /etc/apt/sources.list.d/pgdg.list
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Update apt repo 5
+  shell: |
+    apt update -y
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Install pg_dump
+  package:
+    name: postgresql-client-13
+    state: present
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Install pg_dump
+  package:
+    name: postgresql-13
+    state: present
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Install pg_dump
+  package:
+    name: postgresql-client-common
+    state: present
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: add pg-dump to path
+  lineinfile:
+    path: /etc/environment
+    line: 'PATH=\1\2:/usr/lib/postgresql/13/bin\3'
+    regexp: 'PATH=(["])((?!.*?/usr/lib/postgresql/13/bin).*?)(["])$'
+    backrefs: yes
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Set Fact
+  set_fact:
+    awx_namespace: "{{ awx_namespace | default('awx') }}"
+    api_version: "v1"
+    kind: "Secret"
+    awx_secret_name: "{{ awx_secret_name | default('awx-postgres-configuration') }}"
+    default_backup_file: "awxbackup-{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}.sql.gz"
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Get postgresql credentials
+  kubernetes.core.k8s_info:
+    namespace: "{{ awx_namespace }}"
+    kind: "{{ kind }}"
+    api_version: "{{ api_version }}"
+    name: "{{ awx_secret_name }}"
+    kubeconfig: /etc/rancher/k3s/k3s.yaml 
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+  register: awx_postgres_configuration_secret
+
+- name: Set Postgres Credentials
+  set_fact:
+    awx_db_name: "{{ awx_postgres_configuration_secret.resources[0].data.database | b64decode }}"
+    awx_db_password: "{{ awx_postgres_configuration_secret.resources[0].data.password | b64decode }}"
+    awx_db_user:  "{{ awx_postgres_configuration_secret.resources[0].data.username | b64decode }}"
+    awx_db_host: "{{ awx_db_host | default('ldc254eb.homedepot.com') }}"
+    awx_db_port:  "{{ awx_db_port | default(54321) }}"
+    db_action: "{{ db_action | default('dump') }}"
+    backup_file: "{{ backup_file | default(lookup('vars', 'default_backup_file')) }}"
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Dump Awx Database
+  community.postgresql.postgresql_db:
+    name: "{{ awx_db_name }}"
+    login_host: "{{ awx_db_host }}"
+    login_user: "{{ awx_db_user }}"
+    login_password: "{{ awx_db_password }}"
+    port: "{{ awx_db_port }}"
+    state: "{{ db_action }}"
+    target: "/tmp/{{ backup_file }}"
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"

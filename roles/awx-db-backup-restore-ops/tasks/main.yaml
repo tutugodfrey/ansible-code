@@ -1,0 +1,53 @@
+---
+- name: Set Fact
+  set_fact:
+    awx_namespace: "{{ awx_namespace | default('awx') }}"
+    target_node: "{{ inventory_hostname_short }}"
+    default_backup_file: "awxbackup-{{ lookup('pipe', 'date +%Y-%m-%d-%H-%M-%S') }}.dump"
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Set Postgres Credentials
+  set_fact:
+    awx_file_to_execute: "{{ awx_file_to_execute | default('backup-job.yaml') }}"
+    awx_target_nodename: "{{ awx_target_nodename | default(lookup('vars', 'target_node')) }}"
+    awx_postgres_backup_file: "{{ awx_postgres_backup_file | default(lookup('vars', 'default_backup_file')) }}"
+    awx_postgres_secret_name: "{{ awx_postgres_secret_name | default('awx-postgres-configuration') }}"
+    awx_postgres_service: "{{ awx_postgres_service | default('awx-postgres-13') }}"
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+ 
+- name: Copy awx job template
+  template:
+    src: "templates/{{ awx_file_to_execute }}"
+    dest: /tmp/
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Copy awx config template
+  template:
+    src: templates/job-config.yaml
+    dest: /tmp/awx-job-config.yaml
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Delete old job
+  shell: |
+    kubectl delete -f "/tmp/{{ awx_file_to_execute }}" 
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+  ignore_errors: true
+
+- name: Dump Awx Database
+  shell: |
+    kubectl apply -f /tmp/awx-job-config.yaml
+    kubectl apply -f "/tmp/{{ awx_file_to_execute }}" 
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Output backup file  created
+  debug:
+    msg: "{{ awx_postgres_backup_file }}"
+  run_once: true
+  delegate_to: "{{ inventory_hostname }}"

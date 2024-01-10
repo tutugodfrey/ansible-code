@@ -3,8 +3,11 @@
   hosts: all
   gather_facts: false
   become: true
+  vars:
+    vault_token: "{{ lookup('env', 'VAULT_TOKEN') }}"
+    artifactory_username: "{{ lookup('env', 'ARTIFACTORY_USERNAME') }}"
+    artifactory_password: "{{ lookup('env', 'ARTIFACTORY_PASSWORD') }}"
   roles:
-  - awx-crds
-  - awx-operator
+#  - awx-crds
+#  - awx-operator
   - awx-restore
-

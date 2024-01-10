@@ -1,0 +1,9 @@
+---
+- import_playbook: proxy_env.yml
+ 
+- name: Backup AWX postgres db
+  hosts: all
+  become: true
+  gather_facts: false
+  roles:
+  - awx-db-backup-restore-ops

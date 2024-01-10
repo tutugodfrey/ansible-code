@@ -1,0 +1,11 @@
+---
+- name: Restore database
+  community.postgresql.postgresql_db:
+    name: awx
+    state: restore
+    target: /tmp/awx-postgresql-backup.sql.gz
+    login_host: awx-postgres-service-0
+    login_user: awx
+    owner: awx
+    login_password: password
+    port: 5432

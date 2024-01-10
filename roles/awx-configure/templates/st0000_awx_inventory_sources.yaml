@@ -1,0 +1,137 @@
+nventory_sources:
+- credential: null
+  description: ''
+  enabled_value: ''
+  enabled_var: ''
+  execution_environment:
+    name: 'AWX EE (latest)'
+    type: execution_environment
+  host_filter: ''
+  inventory:
+    name: DEV
+    organization:
+      name: Default
+      type: organization
+    type: inventory
+  name: config
+  natural_key:
+    inventory:
+      name: DEV
+      organization:
+        name: Default
+        type: organization
+      type: inventory
+    name: config
+    type: inventory_source
+  overwrite: true
+  overwrite_vars: true
+  related:
+    notification_templates_error: []
+    notification_templates_started: []
+    notification_templates_success: []
+    schedules: []
+  source: scm
+  source_path: dev/
+  source_project:
+    name: Config
+    organization:
+      name: Default
+      type: organization
+    type: project
+  source_vars: '---'
+  timeout: 0
+  update_cache_timeout: 0
+  update_on_launch: true
+  update_on_project_update: false
+  verbosity: 2
+- credential: null
+  description: ''
+  enabled_value: ''
+  enabled_var: ''
+  execution_environment:
+    name: 'AWX EE (latest)'
+    type: execution_environment
+  host_filter: ''
+  inventory:
+    name: Dev-Ubuntu22
+    organization:
+      name: Default
+      type: organization
+    type: inventory
+  name: Config-THDK8S-1005-Ubuntu22
+  natural_key:
+    inventory:
+      name: Dev-Ubuntu22
+      organization:
+        name: Default
+        type: organization
+      type: inventory
+    name: Config-THDK8S-1005-Ubuntu22
+    type: inventory_source
+  overwrite: true
+  overwrite_vars: true
+  related:
+    notification_templates_error: []
+    notification_templates_started: []
+    notification_templates_success: []
+    schedules: []
+  source: scm
+  source_path: dev/
+  source_project:
+    name: Config-THDK8S-1005-config-Ubuntu22
+    organization:
+      name: Default
+      type: organization
+    type: project
+  source_vars: '---'
+  timeout: 0
+  update_cache_timeout: 0
+  update_on_launch: true
+  update_on_project_update: false
+  verbosity: 1
+- credential: null
+  description: ''
+  enabled_value: ''
+  enabled_var: ''
+  execution_environment:
+    name: 'AWX EE (latest)'
+    type: execution_environment
+  host_filter: ''
+  inventory:
+    name: NP
+    organization:
+      name: Default
+      type: organization
+    type: inventory
+  name: Config NP
+  natural_key:
+    inventory:
+      name: NP
+      organization:
+        name: Default
+        type: organization
+      type: inventory
+    name: Config NP
+    type: inventory_source
+  overwrite: true
+  overwrite_vars: false
+  related:
+    notification_templates_error: []
+    notification_templates_started: []
+    notification_templates_success: []
+    schedules: []
+  source: scm
+  source_path: np/
+  source_project:
+    name: Config
+    organization:
+      name: Default
+      type: organization
+    type: project
+  source_vars: '---'
+  timeout: 0
+  update_cache_timeout: 0
+  update_on_launch: false
+  update_on_project_update: false
+  verbosity: 1
+

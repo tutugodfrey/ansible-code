@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: awx-db-job-config
+  namespace: awx
+data:
+  postgres_host: "{{ awx_postgres_service }}"
